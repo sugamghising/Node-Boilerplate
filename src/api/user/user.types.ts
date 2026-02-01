@@ -1,39 +1,39 @@
 export interface User {
-    id: string;
-    email: string;
-    name: string;
-    createdAt: Date;
-    updatedAt: Date;
+  id: string;
+  email: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface CreateUserDTO {
-    email: string;
-    name: string;
+  email: string;
+  name: string;
 }
 
 export interface UpdateUserDTO {
-    email?: string;
-    name?: string;
+  email?: string;
+  name?: string;
 }
 
 export interface UserResponse {
-    success: true;
-    data: User;
+  success: true;
+  data: User;
 }
 
 export interface UsersResponse {
-    success: true;
-    data: User[];
-    meta: {
-        total: number;
-        page: number;
-        limit: number;
-    };
+  success: true;
+  data: User[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+  };
 }
 
 export interface DeleteResponse {
-    success: true;
-    data: {
-        message: string;
-    };
+  success: true;
+  data: {
+    message: string;
+  };
 }

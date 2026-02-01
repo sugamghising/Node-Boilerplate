@@ -59,6 +59,13 @@ npm run dev
 
 The server will start at `http://localhost:3000`
 
+### API Documentation
+
+Once the server is running, access the Swagger UI documentation at:
+
+- **Swagger UI**: http://localhost:3000/api-docs
+- **OpenAPI JSON**: http://localhost:3000/api-docs.json
+
 ### Verify Installation
 
 ```bash
@@ -196,9 +203,11 @@ v1Router.use('/products', productRoutes);
 | `npm run dev`           | Start development server with hot reload |
 | `npm run build`         | Build for production                     |
 | `npm start`             | Run production build                     |
-| `npm run lint`          | Run ESLint                               |
-| `npm run lint:fix`      | Fix ESLint issues                        |
-| `npm run format`        | Format code with Prettier                |
+| `npm run lint`          | Run Biome linter                         |
+| `npm run lint:fix`      | Fix linting issues                       |
+| `npm run format`        | Format code with Biome                   |
+| `npm run check`         | Run Biome lint + format check            |
+| `npm run check:fix`     | Fix all Biome issues                     |
 | `npm run typecheck`     | Run TypeScript type checking             |
 | `npm test`              | Run tests                                |
 | `npm run test:watch`    | Run tests in watch mode                  |
@@ -418,7 +427,7 @@ All API routes are versioned:
 
 Pre-configured with Husky:
 
-- **pre-commit**: Runs lint-staged (ESLint + Prettier)
+- **pre-commit**: Runs lint-staged (Biome check)
 - **pre-push**: Runs type checking
 
 ## 📦 Tech Stack
@@ -428,9 +437,9 @@ Pre-configured with Husky:
 - **Language**: TypeScript 5
 - **Validation**: Zod
 - **Logging**: Winston
+- **API Docs**: Swagger (OpenAPI 3.0)
 - **Testing**: Vitest + Supertest
-- **Linting**: ESLint
-- **Formatting**: Prettier
+- **Linting & Formatting**: Biome
 - **Git Hooks**: Husky + lint-staged
 
 ## 🤝 Contributing

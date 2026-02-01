@@ -3,30 +3,30 @@
  */
 
 export interface ApiResponse<T> {
-    success: true;
-    data: T;
+  success: true;
+  data: T;
 }
 
 export interface ApiErrorResponse {
-    success: false;
-    error: {
-        message: string;
-        code: string;
-        statusCode: number;
-        details?: unknown;
-        stack?: string;
-    };
+  success: false;
+  error: {
+    message: string;
+    code: string;
+    statusCode: number;
+    details?: unknown;
+    stack?: string;
+  };
 }
 
 export interface PaginationMeta {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface PaginatedResponse<T> {
-    success: true;
-    data: T[];
-    meta: PaginationMeta;
+  success: true;
+  data: T[];
+  meta: PaginationMeta;
 }
