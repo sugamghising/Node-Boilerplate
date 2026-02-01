@@ -213,6 +213,31 @@ v1Router.use('/products', productRoutes);
 | `npm run test:watch`    | Run tests in watch mode                  |
 | `npm run test:coverage` | Run tests with coverage                  |
 
+## 🐳 Docker
+
+### Build and Run Production Container
+
+```bash
+# Build the image
+docker build -t node-api .
+
+# Run the container
+docker run -p 3000:3000 --env-file .env node-api
+```
+
+### Using Docker Compose
+
+```bash
+# Production
+docker compose up -d
+
+# Development with hot reload
+docker compose --profile dev up api-dev
+
+# Stop containers
+docker compose down
+```
+
 ## ⚙️ Environment Variables
 
 | Variable                  | Description             | Default       |
