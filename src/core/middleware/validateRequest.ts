@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from 'express';
-import type { ZodObject, ZodRawShape, ZodTypeAny } from 'zod';
+import type { ZodTypeAny } from 'zod';
 import { BadRequestError } from '../errors/index';
 
-interface RequestSchema extends ZodObject<ZodRawShape> {
+interface RequestSchema {
   shape: {
     body?: ZodTypeAny;
     query?: ZodTypeAny;
