@@ -4,17 +4,29 @@ import { ZodError } from 'zod';
 import { config } from '../../config/index';
 import { AppError, type ErrorResponse } from '../errors/index';
 import { logger } from '../logger/index';
+import { HttpError } from '../utils/throwError';
+
+interface RequestWithId extends Request {
+  id?: string;
+}
+
+interface ErrorWithStatus extends Error {
+  status?: number;
+}
 
 export const errorHandler = (
   err: Error,
-  _req: Request,
+  req: RequestWithId,
   res: Response<ErrorResponse>,
   _next: NextFunction
 ): void => {
-  // Log the error
+  // Log the error with context
   logger.error(`Error: ${err.message}`, {
     stack: err.stack,
     name: err.name,
+    method: req?.method || 'unknown',
+    url: req?.originalUrl || 'unknown',
+    requestId: req?.id || 'unknown',
   });
 
   // Handle Zod validation errors
@@ -31,7 +43,26 @@ export const errorHandler = (
     return;
   }
 
-  // Handle known operational errors
+  // Handle HttpError from throwError utility
+  if (err instanceof HttpError) {
+    const response: ErrorResponse = {
+      success: false,
+      error: {
+        message: err.message,
+        code: err.code,
+        statusCode: err.status,
+      },
+    };
+
+    if (config.isDevelopment) {
+      response.error.stack = err.stack;
+    }
+
+    res.status(err.status).json(response);
+    return;
+  }
+
+  // Handle known operational errors (AppError)
   if (err instanceof AppError) {
     const response: ErrorResponse = {
       success: false,
@@ -52,14 +83,16 @@ export const errorHandler = (
     return;
   }
 
-  // Handle syntax errors in JSON body
-  if (err instanceof SyntaxError && 'body' in err) {
-    res.status(StatusCodes.BAD_REQUEST).json({
+  // Handle errors with status property (generic HTTP errors)
+  const errorWithStatus = err as ErrorWithStatus;
+  if (errorWithStatus.status && typeof errorWithStatus.status === 'number') {
+    const status = errorWithStatus.status;
+    res.status(status).json({
       success: false,
       error: {
-        message: 'Invalid JSON payload',
-        code: 'INVALID_JSON',
-        statusCode: StatusCodes.BAD_REQUEST,
+        message: err.message,
+        code: 'ERROR',
+        statusCode: status,
       },
     });
     return;

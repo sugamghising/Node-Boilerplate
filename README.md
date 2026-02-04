@@ -2,6 +2,17 @@
 
 A production-ready, modular backend boilerplate using Node.js, Express, and TypeScript with a feature-based architecture.
 
+## ✨ Features
+
+- **API Response Standardization**: `ServiceResponse` class for consistent API responses
+- **Type-Safe Validation**: Zod schemas with OpenAPI integration
+- **OpenAPI Registry Pattern**: Auto-generate API docs from Zod schemas using `@asteasolutions/zod-to-openapi`
+- **Error Handling**: `throwError` utility and custom error classes
+- **Modular Architecture**: Feature-based structure for scalability
+- **Security**: Helmet, CORS, Rate limiting built-in
+- **Logging**: Winston with daily rotation
+- **Testing**: Vitest with unit and integration tests
+
 ## 🏗️ Architecture Overview
 
 This boilerplate follows a **modular/feature-based architecture** where each domain is isolated, testable, and easy to scale.
@@ -136,45 +147,84 @@ export type CreateProductInput = z.infer<typeof createProductSchema>;
 ### Step 4: Implement service (`product.service.ts`)
 
 ```typescript
-import type { Product, CreateProductDTO } from './product.types.js';
+import { ServiceResponse, throwNotFound } from '../../core/index';
+import type { Product, CreateProductDTO } from './product.types';
 
-export const productService = {
-  async create(dto: CreateProductDTO): Promise<Product> {
+class ProductService {
+  async create(dto: CreateProductDTO): Promise<ServiceResponse<Product>> {
     // Business logic here
-  },
+    const product = { id: '...', ...dto, createdAt: new Date() };
+    return ServiceResponse.created('Product created successfully', product);
+  }
 
-  async findById(id: string): Promise<Product> {
-    // Business logic here
-  },
-};
+  async findById(id: string): Promise<ServiceResponse<Product>> {
+    const product = await this.getProduct(id);
+    if (!product) {
+      return throwNotFound(`Product with ID ${id} not found`);
+    }
+    return ServiceResponse.success('Product retrieved successfully', product);
+  }
+}
+
+export const productService = new ProductService();
 ```
 
 ### Step 5: Create controller (`product.controller.ts`)
 
 ```typescript
 import type { Request, Response } from 'express';
-import { StatusCodes } from 'http-status-codes';
-import { productService } from './product.service.js';
+import { asyncHandler, handleServiceResponse } from '../../core/index';
+import { productService } from './product.service';
 
-export const productController = {
-  async create(req: Request, res: Response): Promise<void> {
-    const product = await productService.create(req.body);
-    res.status(StatusCodes.CREATED).json({ success: true, data: product });
-  },
-};
+class ProductController {
+  public create = asyncHandler(async (req: Request, res: Response) => {
+    const serviceResponse = await productService.create(req.body);
+    return handleServiceResponse(serviceResponse, res);
+  });
+
+  public getById = asyncHandler(async (req: Request, res: Response) => {
+    const serviceResponse = await productService.findById(req.params['id'] as string);
+    return handleServiceResponse(serviceResponse, res);
+  });
+}
+
+export const productController = new ProductController();
 ```
 
-### Step 6: Define routes (`product.routes.ts`)
+### Step 6: Define routes with OpenAPI (`product.routes.ts`)
 
 ```typescript
+import { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { Router } from 'express';
-import { productController } from './product.controller.js';
-import { validate, asyncHandler } from '../../core/index.js';
-import { createProductSchema } from './product.validation.js';
+import { createApiCreatedResponse, createApiResponse } from '../../config/openapi';
+import { validateRequest } from '../../core/index';
+import { productController } from './product.controller';
+import { CreateProductSchema, ProductSchema } from './product.validation';
 
 const router = Router();
+export const productRegistry = new OpenAPIRegistry();
 
-router.post('/', validate({ body: createProductSchema }), asyncHandler(productController.create));
+const V1 = '/api/v1/';
+
+// Register path for OpenAPI docs
+productRegistry.registerPath({
+  method: 'post',
+  path: `${V1}products`,
+  tags: ['Products'],
+  summary: 'Create a new product',
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: CreateProductSchema.shape.body,
+        },
+      },
+    },
+  },
+  responses: createApiCreatedResponse(ProductSchema, 'Product created successfully'),
+});
+
+router.post('/', validateRequest(CreateProductSchema), productController.create);
 
 export { router as productRoutes };
 ```
@@ -278,6 +328,56 @@ Available error classes:
 - `TooManyRequestsError` (429)
 - `InternalServerError` (500)
 
+### throwError Utility
+
+For quick error throwing in services (preferred pattern):
+
+```typescript
+import { throwError, throwNotFound, throwConflict } from '../../core/index';
+import { StatusCodes } from 'http-status-codes';
+
+// Generic throw with custom status
+throwError('Something went wrong', StatusCodes.BAD_REQUEST, 'CUSTOM_CODE');
+
+// Convenience functions (never return - always throw)
+throwNotFound('User not found');
+throwBadRequest('Invalid input');
+throwUnauthorized('Invalid credentials');
+throwForbidden('Access denied');
+throwConflict('Email already exists');
+```
+
+### ServiceResponse
+
+Standardized API response class:
+
+```typescript
+import { ServiceResponse } from '../../core/index';
+
+// Success responses
+ServiceResponse.success('Data retrieved', data);           // 200
+ServiceResponse.created('Resource created', data);         // 201
+
+// Failure responses
+ServiceResponse.failure('Operation failed', null, 500);
+ServiceResponse.notFound('Resource not found');            // 404
+ServiceResponse.badRequest('Invalid input');               // 400
+ServiceResponse.unauthorized('Invalid credentials');       // 401
+ServiceResponse.conflict('Already exists');                // 409
+```
+
+### handleServiceResponse
+
+Converts ServiceResponse to HTTP response:
+
+```typescript
+import { handleServiceResponse } from '../../core/index';
+
+// In controller
+const serviceResponse = await userService.findById(id);
+return handleServiceResponse(serviceResponse, res);
+```
+
 ### Logging
 
 Winston logger in `src/core/logger/`:
@@ -290,12 +390,46 @@ logger.error('Failed to create user', { error });
 logger.debug('Processing request', { body: req.body });
 ```
 
-### Validation
+### Validation with OpenAPI
 
-Zod-based validation middleware:
+Zod-based validation middleware with OpenAPI support:
 
 ```typescript
-import { validate } from '../../core/middleware/index.js';
+import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
+import { z } from 'zod';
+
+extendZodWithOpenApi(z);
+
+// Define schema with nested body/params/query
+export const CreateUserSchema = z.object({
+  body: z.object({
+    email: z.string().email().openapi({ example: 'user@example.com' }),
+    name: z.string().min(2).max(100).openapi({ example: 'John Doe' }),
+  }),
+});
+
+export const GetUserSchema = z.object({
+  params: z.object({
+    id: z.string().uuid('Invalid user ID format'),
+  }),
+});
+```
+
+Use with `validateRequest` middleware:
+
+```typescript
+import { validateRequest } from '../../core/index';
+
+router.post('/', validateRequest(CreateUserSchema), controller.create);
+router.get('/:id', validateRequest(GetUserSchema), controller.getById);
+```
+
+### Legacy Validation
+
+The original `validate` middleware is still available:
+
+```typescript
+import { validate } from '../../core/middleware/index';
 
 router.post(
   '/',
@@ -403,28 +537,29 @@ Built-in security middleware:
 
 ## 📝 API Design
 
-### Response Format
+### Response Format (ServiceResponse)
+
+All API responses use the standardized `ServiceResponse` format:
 
 **Success:**
 
 ```json
 {
   "success": true,
-  "data": { ... }
+  "message": "Users retrieved successfully",
+  "data": { ... },
+  "statusCode": 200
 }
 ```
 
-**Paginated:**
+**Created (201):**
 
 ```json
 {
   "success": true,
-  "data": [...],
-  "meta": {
-    "total": 100,
-    "page": 1,
-    "limit": 10
-  }
+  "message": "User created successfully",
+  "data": { "id": "...", "email": "..." },
+  "statusCode": 201
 }
 ```
 
@@ -439,6 +574,22 @@ Built-in security middleware:
     "statusCode": 404
   }
 }
+```
+
+### Using ServiceResponse in Services
+
+```typescript
+import { ServiceResponse, throwNotFound, throwConflict } from '../../core/index';
+
+// Success responses
+return ServiceResponse.success('Data retrieved', data);
+return ServiceResponse.created('Resource created', data);
+
+// Error throwing (never returns)
+throwNotFound('Resource not found');
+throwBadRequest('Invalid input');
+throwUnauthorized('Invalid credentials');
+throwConflict('Resource already exists');
 ```
 
 ### Versioned Routes
@@ -460,9 +611,10 @@ Pre-configured with Husky:
 - **Runtime**: Node.js 20+
 - **Framework**: Express 4
 - **Language**: TypeScript 5
-- **Validation**: Zod
-- **Logging**: Winston
-- **API Docs**: Swagger (OpenAPI 3.0)
+- **Validation**: Zod + zod-to-openapi
+- **API Response**: ServiceResponse pattern
+- **Logging**: Winston with daily rotation
+- **API Docs**: OpenAPI 3.0 (auto-generated from Zod schemas)
 - **Testing**: Vitest + Supertest
 - **Linting & Formatting**: Biome
 - **Git Hooks**: Husky + lint-staged

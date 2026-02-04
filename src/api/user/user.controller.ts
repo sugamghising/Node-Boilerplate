@@ -1,60 +1,49 @@
 import type { Request, Response } from 'express';
-import { StatusCodes } from 'http-status-codes';
+import { asyncHandler, handleServiceResponse } from '../../core/index';
 import { userService } from './user.service';
-import type { DeleteResponse, UserResponse, UsersResponse } from './user.types';
 
-export const userController = {
-  async list(req: Request, res: Response<UsersResponse>): Promise<void> {
+class UserController {
+  /**
+   * Get paginated list of users
+   */
+  public list = asyncHandler(async (req: Request, res: Response) => {
     const page = Number(req.query['page']) || 1;
     const limit = Number(req.query['limit']) || 10;
-    const { users, total } = await userService.findAll(page, limit);
+    const serviceResponse = await userService.findAll(page, limit);
+    return handleServiceResponse(serviceResponse, res);
+  });
 
-    res.status(StatusCodes.OK).json({
-      success: true,
-      data: users,
-      meta: {
-        total,
-        page,
-        limit,
-      },
-    });
-  },
+  /**
+   * Get user by ID
+   */
+  public getById = asyncHandler(async (req: Request, res: Response) => {
+    const serviceResponse = await userService.findById(req.params['id'] as string);
+    return handleServiceResponse(serviceResponse, res);
+  });
 
-  async getById(req: Request, res: Response<UserResponse>): Promise<void> {
-    const user = await userService.findById(req.params['id'] as string);
+  /**
+   * Create a new user
+   */
+  public create = asyncHandler(async (req: Request, res: Response) => {
+    const serviceResponse = await userService.create(req.body);
+    return handleServiceResponse(serviceResponse, res);
+  });
 
-    res.status(StatusCodes.OK).json({
-      success: true,
-      data: user,
-    });
-  },
+  /**
+   * Update an existing user
+   */
+  public update = asyncHandler(async (req: Request, res: Response) => {
+    const serviceResponse = await userService.update(req.params['id'] as string, req.body);
+    return handleServiceResponse(serviceResponse, res);
+  });
 
-  async create(req: Request, res: Response<UserResponse>): Promise<void> {
-    const user = await userService.create(req.body);
+  /**
+   * Delete a user
+   */
+  public delete = asyncHandler(async (req: Request, res: Response) => {
+    const serviceResponse = await userService.delete(req.params['id'] as string);
+    return handleServiceResponse(serviceResponse, res);
+  });
+}
 
-    res.status(StatusCodes.CREATED).json({
-      success: true,
-      data: user,
-    });
-  },
-
-  async update(req: Request, res: Response<UserResponse>): Promise<void> {
-    const user = await userService.update(req.params['id'] as string, req.body);
-
-    res.status(StatusCodes.OK).json({
-      success: true,
-      data: user,
-    });
-  },
-
-  async delete(req: Request, res: Response<DeleteResponse>): Promise<void> {
-    await userService.delete(req.params['id'] as string);
-
-    res.status(StatusCodes.OK).json({
-      success: true,
-      data: {
-        message: 'User deleted successfully',
-      },
-    });
-  },
-};
+export const userController = new UserController();

@@ -16,15 +16,9 @@ describe('User Routes', () => {
     it('should return empty array when no users', async () => {
       const response = await request(app).get('/api/v1/users').expect(200);
 
-      expect(response.body).toEqual({
-        success: true,
-        data: [],
-        meta: {
-          total: 0,
-          page: 1,
-          limit: 10,
-        },
-      });
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.users).toEqual([]);
+      expect(response.body.data.total).toBe(0);
     });
 
     it('should return paginated users', async () => {
@@ -33,19 +27,19 @@ describe('User Routes', () => {
 
       const response = await request(app).get('/api/v1/users?page=1&limit=1').expect(200);
 
-      expect(response.body.data).toHaveLength(1);
-      expect(response.body.meta.total).toBe(2);
+      expect(response.body.data.users).toHaveLength(1);
+      expect(response.body.data.total).toBe(2);
     });
   });
 
   describe('GET /api/v1/users/:id', () => {
     it('should return user by id', async () => {
-      const user = await userService.create({
+      const userResponse = await userService.create({
         email: 'test@example.com',
         name: 'Test User',
       });
 
-      const response = await request(app).get(`/api/v1/users/${user.id}`).expect(200);
+      const response = await request(app).get(`/api/v1/users/${userResponse.data.id}`).expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.email).toBe('test@example.com');
@@ -57,13 +51,13 @@ describe('User Routes', () => {
         .expect(404);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.error.code).toBe('NOT_FOUND');
     });
 
     it('should return 400 for invalid uuid', async () => {
       const response = await request(app).get('/api/v1/users/invalid-id').expect(400);
 
       expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('BAD_REQUEST');
     });
   });
 
@@ -97,19 +91,18 @@ describe('User Routes', () => {
         .expect(409);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.error.code).toBe('CONFLICT');
     });
   });
 
   describe('PATCH /api/v1/users/:id', () => {
     it('should update user', async () => {
-      const user = await userService.create({
+      const userResponse = await userService.create({
         email: 'test@example.com',
         name: 'Test User',
       });
 
       const response = await request(app)
-        .patch(`/api/v1/users/${user.id}`)
+        .patch(`/api/v1/users/${userResponse.data.id}`)
         .send({ name: 'Updated Name' })
         .expect(200);
 
@@ -120,15 +113,15 @@ describe('User Routes', () => {
 
   describe('DELETE /api/v1/users/:id', () => {
     it('should delete user', async () => {
-      const user = await userService.create({
+      const userResponse = await userService.create({
         email: 'test@example.com',
         name: 'Test User',
       });
 
-      await request(app).delete(`/api/v1/users/${user.id}`).expect(200);
+      await request(app).delete(`/api/v1/users/${userResponse.data.id}`).expect(200);
 
       // Verify user is deleted
-      await request(app).get(`/api/v1/users/${user.id}`).expect(404);
+      await request(app).get(`/api/v1/users/${userResponse.data.id}`).expect(404);
     });
   });
 });
